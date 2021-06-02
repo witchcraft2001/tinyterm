@@ -154,3 +154,9 @@ set_ip_conf:
 	pop	af
 	call	close_isa_ports
 	ret
+
+get_ip_port:
+	call	open_isa_ports
+	ld	a,(hl)
+	call	close_isa_ports
+	RET

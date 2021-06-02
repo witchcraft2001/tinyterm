@@ -62,7 +62,80 @@ start:	call	clear_screen	;CLS SCREEN
 	call	prn_tx		;напечатать
 	xor	a		; 0
 	ld	(flg_xm),a	;-> флаг загрузки
+	ld	hl,txt_isa_reset
+	call	prn_tx
+
 	call	reset_isa
+
+	;read all com ports
+	ld	hl,isa_adr_base + base_com1_addr
+	call	read_ports
+	ld	hl,isa_adr_base + base_com2_addr
+	call	read_ports
+	; ld	hl,isa_adr_base + base_com3_addr
+	; call	read_ports
+	; ld	hl,isa_adr_base + base_com4_addr
+	; call	read_ports
+
+	call	set_ip_conf
+
+	ld	hl,isa_adr_base + base_com1_addr
+	call	read_ports
+	ld	hl,isa_adr_base + base_com2_addr
+	call	read_ports
+
+	jp	break
+
+read_ports:
+	ld	b,9
+	push	hl
+	ld	hl,cr_lf
+	call	prn_tx
+	pop	hl
+.loop:	push	bc	
+	push	hl
+	ld	hl,txt_com_adr
+	call	prn_tx
+	pop	hl
+	push	hl
+	ld	bc,txt_baud
+	push	bc
+	call	PRNUM0
+	pop	hl
+	call	prn_tx
+	ld	hl,txt_com_value
+	call	prn_tx
+	pop	hl
+	push	hl
+	call	get_ip_port
+	ld	l,a
+	ld	bc,txt_baud1
+	push	bc
+	call	PRNUM
+	pop	hl
+	call	prn_tx
+	pop	hl
+	pop	bc
+	inc	hl
+	ld	a,h
+	push	hl
+	cp	6
+	ld	hl,cr_lf
+	call	z,prn_tx
+	pop	hl
+	djnz	.loop
+	ld	hl,cr_lf
+	call	prn_tx
+	ret	
+
+txt_isa_reset:
+	db	'Reseting ISA ...'
+cr_lf:	db	CR,LF,0
+txt_com_adr:
+	db	' Addr: ',0
+txt_com_value:
+	db	' = ',0
+
 	call	set_ip_conf	;Конфигурируем 16550
 	ld	l,a
 	ld	bc,txt_baud
@@ -220,7 +293,9 @@ txt_tt:	db	'** TinyTerm **',CR,LF
 txt_ip_conf:
 	db	'Old 16C550 baud config: '
 txt_baud:
-	db	'     ',CR,LF,0
+	db	'     ',0
+txt_baud1:
+	db	'     ',0
 txt_ok:	db	'OK',CR,LF,0
 txt_err:db	'ERR',CR,LF,0
 txt_rx:	db	CR,LF,'XMODEM ',0

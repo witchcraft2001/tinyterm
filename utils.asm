@@ -61,3 +61,23 @@ __delay:	ld e,l
 .b1:		rra
 		ret nc
 		ret
+
+;=========================================
+scan_key:
+	ld	c,Dss.ScanKey
+	rst	10h
+	ret
+;=========================================
+prn_a:	push	hl
+	ld	c,Dss.PutChar
+	; cp	TAB		; TAB
+	; jr	nz,no_tab
+	; ld	a,' '		;заменить на пробел
+no_tab:	RST	10h
+	pop	hl
+	RET
+;=========================================
+prn_tx:	ld	c,Dss.PChars
+	rst	10h
+	ret
+;-----------------------------------------

@@ -42,6 +42,7 @@ nak	equ	15h	; ASCII <nak> char
 ; Порты ZXMC для работы с блочными устройствами
 dt_dev	equ	0D8EFh	;Порт данных блочных устройств
 st_dev	equ	0D9EFh	;Порт Статуса блочных устройств
+run_adr	equ	0C000h	;Адрес загрузки и запуска кодового блока
 ;---------------------------------------
 .z80
 	; .phase	6100h		;Адрес загрузки и запуска
@@ -61,6 +62,13 @@ start:	call	clear_screen	;CLS SCREEN
 	call	prn_tx		;напечатать
 	xor	a		; 0
 	ld	(flg_xm),a	;-> флаг загрузки
+	call	reset_isa
+	call	set_ip_conf	;Конфигурируем 16550
+	ld	l,a
+	ld	bc,txt_baud
+	call	PRNUM
+	ld	hl,txt_ip_conf
+	call	prn_tx
 	jr	term_
 ;*****************************************
 ; Выход из терминалки
@@ -70,6 +78,7 @@ break:
 	RST	0x10			; exit
 clear_screen:
 	ld	de,0
+	xor	a
 	push	de
 	ld	hl,2050h
 	ld	b,7
@@ -84,7 +93,6 @@ clr_scr:
 	call	clear_screen	;CLS SCREEN
 term_:	
 ;//-------------------------------------------------
-	call	reset_isa
 	ld	hl,0
 	ld	(cnt_rd),hl	;Счетчик буфера = 0
 ;/-------------------------------
@@ -95,8 +103,18 @@ z_cikl: call	set_rts		;готов к приему
 ;/--------------------------------------------------
 c_term:	call	scan_key	;Клавиша нажата ?
 	jr	z,no_key	;Если = 0, то нет
+	ld	a,d
+	cp	#44		;F10
+	jr	z,break		;-> выход из программы
+	BIT	5,B             ;При нажатом Ctrl
+        jr      z,tst_keys
+        and     #7f
+        cp      #2a             ;Ctrl+Z
+	jr	z,break		;-> выход из программы
 ; клавиша нажата
 ; проверить управляющие коды
+tst_keys:
+	ld	a,e
 	cp	' '		;все что меньше 20h
 	jr	c,tst_cc	;
 	cp	80h		;и все что больше 7Fh
@@ -105,21 +123,25 @@ c_term:	call	scan_key	;Клавиша нажата ?
 tst_cc:	cp	CR		;ENTER
 	jr	z,send_cr
 ;
-	cp	SS_Q	 	;SS+Q ?	
-	jr	z,break		;-> выход из программы
+;	cp	SS_Q	 	;SS+Q ?	
+;	jr	z,break		;-> выход из программы
 ;
-	cp	SS_E		;SS+E ?
-	jr	z,clr_scr	;-> очистка экрана
+	; cp	SS_E		;SS+E ?
+	; jr	z,clr_scr	;-> очистка экрана
 ;
-	cp	CS_0		;<- возврат на шаг ?
+	cp	BS		;<- возврат на шаг ?
 	jr	z,back_s	;
-;
+	cp	#1b		;Esc
+	jr	z,clr_scr	;-> очистка экрана
+	ld	a,d
 	ld	hl,c_term	;адрес возврата
 	push	hl		; из процедуры
-	ld	hl,8000h	; адрес загрузки и запуска
+	ld	hl,run_adr	; адрес загрузки и запуска
 ;
-	cp	CS_3		;CS+3 Page Up   ?
-	jr	z,run_fl	; -> запустить файл
+	cp	#3f		;F5
+	jr	z,run_fl	;-> запустить файл
+	; cp	CS_3		;CS+3 Page Up   ?
+	; jr	z,run_fl	; -> запустить файл
 	
 	cp	CS_4		;CS+4 Page Down ?
 	ret	nz		; в начало цикла
@@ -192,33 +214,20 @@ no_get: ld	hl,(cnt_rd)	;Счетчик буфера
 	call	prn_a	;
 c1term:	jp	c_term		;
 ;\--- Конец цикла терминала --------------
-;=========================================
-scan_key:
-	ld	c,Dss.ScanKey
-	rst	10h
-	ret
-;=========================================
-prn_a:	push	hl
-	ld	c,Dss.PutChar
-	; cp	TAB		; TAB
-	; jr	nz,no_tab
-	; ld	a,' '		;заменить на пробел
-no_tab:	RST	10h
-	pop	hl
-	RET
-;=========================================
-prn_tx:	ld	c,Dss.PChars
-	rst	10h
-	ret
-;-----------------------------------------
 txt_tt:	db	'** TinyTerm **',CR,LF
 	db	'Ctrl+Z - Quit, SS+E - CLS',CR,LF
 	db	'CS+4 - Load, CS+3 - RUN',CR,LF,0
+txt_ip_conf:
+	db	'Old 16C550 baud config: '
+txt_baud:
+	db	'     ',CR,LF,0
 txt_ok:	db	'OK',CR,LF,0
 txt_err:db	'ERR',CR,LF,0
 txt_rx:	db	CR,LF,'XMODEM ',0
 txt_jm:	db	CR,LF,'No file',0
 ;=========================================
+	include "prnum.asm"	
+;--------------------------------------------
 	include	"isa.asm"
 ;--------------------------------------------
 	include "rs232.asm"

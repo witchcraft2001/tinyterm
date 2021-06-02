@@ -135,3 +135,22 @@ set_reg:ld	(hl),a
 	call	close_isa_ports
 	pop	hl
 	RET
+set_ip_conf:
+	call	open_isa_ports
+	ld	hl,SER_P+3	;Line Control Register
+	ld	a,(hl)
+	push	af
+	ld	a,%10000011	;enable Baud Rate Generator Latch
+	ld	(hl),a
+	;set 115200 baud speed
+	ld	hl,SER_P	
+	ld	(hl),1		;DLL(LSB)
+	inc	hl
+	ld	(hl),0		;DLM(MSB)
+	and	#7f		;disable Baud Rate Generator Latch
+	inc	hl
+	inc	hl
+	ld	(hl),a		;SER_P+3
+	pop	af
+	call	close_isa_ports
+	ret

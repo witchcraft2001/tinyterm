@@ -12,6 +12,10 @@ osfmount.com -a -t file -o rw -f build/%PROG%.img -m X:
 if errorlevel 1 goto ERR
 mkdir X:\%PROG%
 copy /Y %PROG%.EXE X:\%PROG%
+mkdir X:\SRC
+mkdir X:\SRC\INCLUDE
+copy /Y *.asm X:\SRC
+copy /Y INCLUDE\*.asm X:\SRC\INCLUDE
 if errorlevel 1 goto ERR
 rem Delay before unmount image
 timeout 2 > nul

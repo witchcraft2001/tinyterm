@@ -1,67 +1,36 @@
-	device	zxspectrum128
-	include "include\dss_equ.asm"
-	include "include\head.asm"
-	include "include\sp_equ.asm"
+	include "dss_equ.asm"
+	include "head.asm"
+	include "sp_equ.asm"
 	
-;========================================+
-; Мини Терминал для работы в ZX_MCard	 !
-; Загружается в Спектруме с адреса 6100h !
-; В памяти ZXMC хранится с адреса 1200h  !
-;====== 02.05.2006 ======================+
-; Камиль Каримов (caro) k2k@list.ru	 !
-;========================================+
-; Коды клавиш, нажатых с Caps Shift
-CS_1	equ	07h	;RUS/LAT
-CS_2	equ	06h	;Caps Lock
-CS_3	equ	04h	;Pg Up   - запуск программы
-CS_4	equ	05h     ;Pg Down - загрузить файл
-CS_5	equ	08h
-CS_6	equ	0Ah
-CS_7	equ	0Bh
-CS_8	equ	09h
-CS_9	equ	0Fh	;
-CS_0	equ	0Ch	;<- DEL
-; Коды клавиш, нажатых с Symb Shift
-SS_Q	equ	0C7h	;Quit - выход в Basic
-SS_W	equ	0C9h	;
-SS_E	equ	0C8h	;Erase - Очистить экран
-SS_A	equ	0E2h	;
-SS_S	equ	0C3h	;
-; Коды управления экраном
-BS	equ	08h	;Возврат на шаг
-TAB	equ	09h	;Табуляция
-CR	equ	0Dh	;Возврат каретки
-LF	equ	0Ah	;Перевод строки
+;========================================================+
+; Mini terminal for working with serial port             !
+;====== 02.05.2006 ======================================+
+; Kamil Karimov (caro) k2k@list.ru                       !
+;====== 03.06.2021 ======================================+
+; Dmitry Mikhaltchenkov (Hard) mikhaltchenkov@gmail.com  !
+;========================================================+
+; Screen Control codes
+BS	equ	08h	;Back space
+TAB	equ	09h	;Tab
+CR	equ	0Dh	;Caret return
+LF	equ	0Ah	;Line Feed
 ESC	equ	1Bh	;Escape
-; Коды управления RS232
+; RS232 Control codes
 soh	equ	01h	; ASCII <soh> char
 eot	equ	04h	; ASCII <eot> char
 ack	equ	06h	; ASCII <ack> char
 nak	equ	15h	; ASCII <nak> char
 ;---------------------------------------
-; Порты ZXMC для работы с блочными устройствами
-dt_dev	equ	0D8EFh	;Порт данных блочных устройств
-st_dev	equ	0D9EFh	;Порт Статуса блочных устройств
-run_adr	equ	0C000h	;Адрес загрузки и запуска кодового блока
+run_adr	equ	0C000h	;Addres for load and run code
 ;---------------------------------------
-.z80
-	; .phase	6100h		;Адрес загрузки и запуска
-; Дозагрузка кода терминалки
-; loader:	ld	hl,start	;Адрес загрузки
-; c_load:	ld	bc,st_dev	;bc = Порт статуса
-; 	in	a,(c)		;Если STAT=0
-; 	jr	z,start         ; то конец загрузки
-; 	dec	b		;bc = Порт данных
-; 	ini			;(HL)=порт(C);INC HL
-; 	jr	c_load		;Следующий байт
-;==========================================
-; Старт терминалки
+;.z80
+; Start application
 begin:
 start:	call	clear_screen	;CLS SCREEN
-	ld	hl,txt_tt	;Заголовок
-	call	prn_tx		;напечатать
+	ld	hl,txt_tt	;Print header
+	call	prn_tx		;
 	xor	a		; 0
-	ld	(flg_xm),a	;-> флаг загрузки
+	ld	(flg_xm),a	;-> loading flag
 	ld	hl,txt_isa_reset
 	call	prn_tx
 
@@ -78,6 +47,13 @@ start:	call	clear_screen	;CLS SCREEN
 	; call	read_ports
 
 	call	set_ip_conf
+	push	bc
+	pop	hl
+	ld	bc,txt_baud
+	push	bc
+	call	PRNUM0
+	pop	hl
+	call	prn_tx
 
 	ld	hl,isa_adr_base + base_com1_addr
 	call	read_ports
@@ -87,11 +63,11 @@ start:	call	clear_screen	;CLS SCREEN
 	jp	break
 
 read_ports:
-	ld	b,9
 	push	hl
 	ld	hl,cr_lf
 	call	prn_tx
 	pop	hl
+	ld	b,8
 .loop:	push	bc	
 	push	hl
 	ld	hl,txt_com_adr
@@ -136,7 +112,7 @@ txt_com_adr:
 txt_com_value:
 	db	' = ',0
 
-	call	set_ip_conf	;Конфигурируем 16550
+	call	set_ip_conf	;Configure 16550
 	ld	l,a
 	ld	bc,txt_baud
 	call	PRNUM
@@ -144,7 +120,7 @@ txt_com_value:
 	call	prn_tx
 	jr	term_
 ;*****************************************
-; Выход из терминалки
+; Quit from terminal
 break:
 	call	close_isa_ports
 	LD	BC, 0x0041
@@ -161,13 +137,13 @@ clear_screen:
 	ld	c,Dss.Locate
 	rst	10h
 	ret
-; SS+E - Очистка экрана и курсор в начало
+; Esc - Clear the screen and set cursor position to 0
 clr_scr:
 	call	clear_screen	;CLS SCREEN
 term_:	
 ;//-------------------------------------------------
 	ld	hl,0
-	ld	(cnt_rd),hl	;Счетчик буфера = 0
+	ld	(cnt_rd),hl	;buffer counter = 0
 ;/-------------------------------
 z_cikl: call	set_rts		;готов к приему
 	ld	hl,buf_rd	;буфер терминала
@@ -205,19 +181,22 @@ tst_cc:	cp	CR		;ENTER
 	cp	BS		;<- возврат на шаг ?
 	jr	z,back_s	;
 	cp	#1b		;Esc
-	jr	z,clr_scr	;-> очистка экрана
+	jr	z,clr_scr	;-> Clear screen
 	ld	a,d
 	ld	hl,c_term	;адрес возврата
 	push	hl		; из процедуры
 	ld	hl,run_adr	; адрес загрузки и запуска
 ;
-	cp	#3f		;F5
+	cp	#43		;F9
 	jr	z,run_fl	;-> запустить файл
 	; cp	CS_3		;CS+3 Page Up   ?
 	; jr	z,run_fl	; -> запустить файл
 	
-	cp	CS_4		;CS+4 Page Down ?
-	ret	nz		; в начало цикла
+	; cp	CS_4		;CS+4 Page Down ?
+	; ret	nz		; 
+	cp	#3f		;F5
+	ret	nz		;-> to loop start
+
 ;\-------------------------------
 ; принять файл по протоколу XMODEM
 rx_fl:	ld	(adr_fl),hl	;Адрес загрузки
@@ -288,8 +267,8 @@ no_get: ld	hl,(cnt_rd)	;Счетчик буфера
 c1term:	jp	c_term		;
 ;\--- Конец цикла терминала --------------
 txt_tt:	db	'** TinyTerm **',CR,LF
-	db	'Ctrl+Z - Quit, SS+E - CLS',CR,LF
-	db	'CS+4 - Load, CS+3 - RUN',CR,LF,0
+	db	'Ctrl+Z - Quit, Esc - CLS',CR,LF
+	db	'F5 - Load, F9 - RUN',CR,LF,0
 txt_ip_conf:
 	db	'Old 16C550 baud config: '
 txt_baud:
@@ -320,7 +299,5 @@ adr_fl:	ds	2	;текущий адрес файла
 def_dma:ds	0	;буфер для приема блока
 buf_rd: ds	0	;
 ;------------------------------------------
-	end
 end_addr:
-	savebin "tinyterm.exe",start_addr,end_addr-start_addr
 	

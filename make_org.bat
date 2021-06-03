@@ -1,0 +1,1 @@
+orgasm.exe %appname%.asm

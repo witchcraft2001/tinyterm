@@ -43,7 +43,7 @@ PRN4		sla  l		;98DE
 		cp   c
 		jr   c,PRN3	;98EF
 		sub  c
-		sli  e
+		sll  e		;original was "sli e", but sjasm isn't recognize opcode
 		rl   d
 		jr   nc,PRN4	;98DE
 		jr   PRN7	;98F5

@@ -35,90 +35,104 @@ start:	call	clear_screen	;CLS SCREEN
 	call	prn_tx
 
 	call	reset_isa
+	call	set_ip_conf
+	; ld	hl,esp_baudrate_set
+	; call	send_cmd
+	; call	set_ip_conf2
+	; ld	hl,esp_test
+	; call	send_cmd
+	jp	term_
 
 	;read all com ports
-	ld	hl,isa_adr_base + base_com1_addr
-	call	read_ports
-	ld	hl,isa_adr_base + base_com2_addr
-	call	read_ports
-	; ld	hl,isa_adr_base + base_com3_addr
+	; ld	hl,isa_adr_base + base_com1_addr
 	; call	read_ports
-	; ld	hl,isa_adr_base + base_com4_addr
+	; ld	hl,isa_adr_base + base_com2_addr
 	; call	read_ports
+	; ; ld	hl,isa_adr_base + base_com3_addr
+	; ; call	read_ports
+	; ; ld	hl,isa_adr_base + base_com4_addr
+	; ; call	read_ports
 
-	call	set_ip_conf
-	push	bc
-	pop	hl
-	ld	bc,txt_baud
-	push	bc
-	call	PRNUM0
-	pop	hl
-	call	prn_tx
+	; call	set_ip_conf
+run_term:
+;	call	set_ip_conf	;Configure 16550
+;	ld	l,a
+;	ld	bc,txt_baud
+;	call	PRNUM
+;	ld	hl,txt_ip_conf
+;	call	prn_tx
 
-	ld	hl,isa_adr_base + base_com1_addr
-	call	read_ports
-	ld	hl,isa_adr_base + base_com2_addr
-	call	read_ports
+; isa_test:
+; 	push	bc
+; 	pop	hl
+; 	ld	bc,txt_baud
+; 	push	bc
+; 	call	PRNUM0
+; 	pop	hl
+; 	call	prn_tx
 
-	jp	break
+; 	ld	hl,isa_adr_base + base_com1_addr
+; 	call	read_ports
+; 	ld	hl,isa_adr_base + base_com2_addr
+; 	call	read_ports
 
-read_ports:
-	push	hl
-	ld	hl,cr_lf
-	call	prn_tx
-	pop	hl
-	ld	b,8
-.loop:	push	bc	
-	push	hl
-	ld	hl,txt_com_adr
-	call	prn_tx
-	pop	hl
-	push	hl
-	ld	bc,txt_baud
-	push	bc
-	call	PRNUM0
-	pop	hl
-	call	prn_tx
-	ld	hl,txt_com_value
-	call	prn_tx
-	pop	hl
-	push	hl
-	call	get_ip_port
-	ld	l,a
-	ld	bc,txt_baud1
-	push	bc
-	call	PRNUM
-	pop	hl
-	call	prn_tx
-	pop	hl
-	pop	bc
-	inc	hl
-	ld	a,h
-	push	hl
-	cp	6
-	ld	hl,cr_lf
-	call	z,prn_tx
-	pop	hl
-	djnz	.loop
-	ld	hl,cr_lf
-	call	prn_tx
-	ret	
+; 	jp	break
+
+; read_ports:
+; 	push	hl
+; 	ld	hl,cr_lf
+; 	call	prn_tx
+; 	pop	hl
+; 	ld	b,8
+; .loop:	push	bc	
+; 	push	hl
+; 	ld	hl,txt_com_adr
+; 	call	prn_tx
+; 	pop	hl
+; 	push	hl
+; 	ld	bc,txt_baud
+; 	push	bc
+; 	call	PRNUM0
+; 	pop	hl
+; 	call	prn_tx
+; 	ld	hl,txt_com_value
+; 	call	prn_tx
+; 	pop	hl
+; 	push	hl
+; 	call	get_ip_port
+; 	ld	l,a
+; 	ld	bc,txt_baud1
+; 	push	bc
+; 	call	PRNUM
+; 	pop	hl
+; 	call	prn_tx
+; 	pop	hl
+; 	pop	bc
+; 	inc	hl
+; 	ld	a,h
+; 	push	hl
+; 	cp	6
+; 	ld	hl,cr_lf
+; 	call	z,prn_tx
+; 	pop	hl
+; 	djnz	.loop
+; 	ld	hl,cr_lf
+; 	call	prn_tx
+; 	ret	
+
+esp_baudrate_set:
+	db	'AT+UART=57600,8,1,0,0',CR,LF,0
+esp_test:
+	db	'AT',CR,LF,0
 
 txt_isa_reset:
 	db	'Reseting ISA ...'
 cr_lf:	db	CR,LF,0
-txt_com_adr:
-	db	' Addr: ',0
-txt_com_value:
-	db	' = ',0
+; txt_com_adr:
+; 	db	' Addr: ',0
+; txt_com_value:
+; 	db	' = ',0
 
-	call	set_ip_conf	;Configure 16550
-	ld	l,a
-	ld	bc,txt_baud
-	call	PRNUM
-	ld	hl,txt_ip_conf
-	call	prn_tx
-	jr	term_
 ;*****************************************
 ; Quit from terminal
 break:
@@ -215,9 +229,21 @@ no_jmp:	ld	hl,txt_jm	; 'No file'
 back_s:	ld	a,BS		;Back Space
 	jr	send_s
 ; возврат каретки
-send_cr:ld	a,LF		;перевод строки
+send_cr:
+	ld	a,CR		;CR
+	call	tx_byte
+	ld	a,LF		;LF
 	call	tx_byte
 	ld	a,CR		;возврат каретки
+
+; send_cmd:
+; 	ld	a,(hl)
+; 	and	a
+; 	ret	z
+; 	push	hl
+; 	call	send_sym
+; 	pop	hl
+; 	jr	send_cmd
 ;------
 ; введенный с клавиатуры символ (A) -> RS232
 send_s:	call	tx_byte 	;передать

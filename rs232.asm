@@ -6,12 +6,15 @@ base_com2_addr	equ 0x2f8
 base_com3_addr	equ 0x3e8
 base_com4_addr	equ 0x2e8
 
-SER_P	equ	isa_adr_base + base_com1_addr	;Port COM1
+SER_P	equ	isa_adr_base + base_com2_addr	;Port COM
 ;------------------------------------------------
 ;	send byte (A)
 ; CY=0 successful
 ; CY=1 canceled by user <BREAK>
 tx_byte:PUSH	BC
+	; push	af
+	; call	prn_a
+	; pop	af
 	LD	C,A	;byte for tranceive
 ;/-----
 sen1byt:CALL	tst_tx	   ;ready to tranceive?
@@ -134,8 +137,12 @@ set_reg:ld	(hl),a
 	call	close_isa_ports
 	pop	hl
 	RET
+;115200
 set_ip_conf:
 	call	open_isa_ports
+	ld	hl,SER_P+2	;FCR (Write+2)
+	ld	(hl),%10000001	;Set 8 bytes FIFO buffer
+
 	ld	hl,SER_P+3	;Line Control Register (Read Base+3)
 	ld	a,(hl)
 	push	af
@@ -145,6 +152,32 @@ set_ip_conf:
 	ld	hl,SER_P	
 	ld	c,(hl)
 	ld	(hl),1		;DLL(LSB)
+	inc	hl
+	ld	b,(hl)
+	ld	(hl),0		;DLM(MSB)
+	and	#7f		;disable Baud Rate Generator Latch
+	inc	hl
+	inc	hl
+	ld	(hl),a		;SER_P+3
+	pop	af
+	call	close_isa_ports
+	ret
+
+;57600
+set_ip_conf2:
+	call	open_isa_ports
+	ld	hl,SER_P+2	;FCR (Write+2)
+	ld	(hl),%10000001	;Set 8 bytes FIFO buffer
+
+	ld	hl,SER_P+3	;Line Control Register (Read Base+3)
+	ld	a,(hl)
+	push	af
+	ld	a,%10000011	;enable Baud Rate Generator Latch
+	ld	(hl),a
+	;set 115200 baud speed
+	ld	hl,SER_P	
+	ld	c,(hl)
+	ld	(hl),2		;DLL(LSB)
 	inc	hl
 	ld	b,(hl)
 	ld	(hl),0		;DLM(MSB)
